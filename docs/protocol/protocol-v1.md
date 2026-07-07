@@ -1,30 +1,131 @@
 # Protocol v1 — Pi ↔ ESP32 USB serial
 
-Status: **draft / placeholder**, established during initial environment
-setup so `AGENTS.md`'s "protocol changes touch four places together" rule
-has something concrete to point at. Fill in wire-format details as the
-supervisory app and firmware are actually implemented; keep this file,
-`state-machine.md`, the Pi client, the ESP32 firmware, and any simulator in
-sync per `AGENTS.md`.
+Status: **milestone 1 / safe discovery only**. This document,
+`state-machine.md`, the Pi client, the ESP32 firmware, and the simulator
+tests must stay in sync per `AGENTS.md`.
 
 ## Transport
 
-- USB CDC-ACM serial, line-oriented, UTF-8 text framing (see
-  `src/neurosync/control/serial_link.py` for the Pi-side transport helper).
-- Baud rate, framing, and message encoding (e.g., newline-delimited JSON vs.
-  a compact binary format) are **TODO** — decide before implementing the
-  ESP32-side parser, not after.
+- UART0 over the ESP32-WROOM-32 CP2102 USB serial bridge.
+- 115200 baud, 8 data bits, no parity, 1 stop bit.
+- Newline-delimited UTF-8 JSON. No binary protocol exists yet.
+- Pi requests are compact single-line JSON objects and must be at most 512
+  bytes before the terminating newline.
+- The ESP32 reads serial with a timeout and never blocks indefinitely waiting
+  for input. Serial parsing is ordinary task code, never ISR code.
+- The protocol code is structured so the baud rate can later be raised to
+  460800 after error-free testing.
+
+## Request envelope
+
+Every request has this shape:
+
+```json
+{"version":1,"sequence":1,"command":"hello"}
+```
+
+- `version` must be `1`.
+- `sequence` must be a positive integer. Responses echo it.
+- `command` is one of the milestone-1 commands below.
+
+## Milestone-1 commands
+
+Only these commands are implemented:
+
+| Command | Purpose | Output effect |
+|---|---|---|
+| `hello` | Identify the controller and disabled capabilities | none |
+| `get_status` | Report safe state, uptime, reset reason, fault count | none |
+| `heartbeat` | Liveness check while remaining in `SAFE` | none |
+
+`configure`, `arm`, `start`, and active `stop` behavior are intentionally
+not implemented in milestone 1. DAC, ADC, PWM, MCPWM, LED, haptic,
+Wi-Fi, Bluetooth, current-source control, and output-enable-high behavior
+are also not implemented.
+
+## Responses
+
+`hello` response:
+
+```json
+{
+  "version": 1,
+  "sequence": 1,
+  "status": "ack",
+  "command": "hello",
+  "device": "neurosync-esp32",
+  "firmware_version": "0.1.0",
+  "git_commit": "unknown",
+  "esp_idf_version": "5.x",
+  "chip_model": "ESP32",
+  "chip_revision": 3,
+  "state": "SAFE",
+  "output_enable": false,
+  "capabilities": {
+    "configure": false,
+    "arm": false,
+    "start": false,
+    "dac": false,
+    "adc": false,
+    "pwm": false
+  }
+}
+```
+
+`get_status` response:
+
+```json
+{
+  "version": 1,
+  "sequence": 1,
+  "status": "ack",
+  "command": "get_status",
+  "state": "SAFE",
+  "output_enable": false,
+  "uptime_ms": 1234,
+  "reset_reason": "power-on",
+  "faults": 0
+}
+```
+
+`heartbeat` response:
+
+```json
+{
+  "version": 1,
+  "sequence": 1,
+  "status": "ack",
+  "command": "heartbeat",
+  "state": "SAFE",
+  "output_enable": false,
+  "uptime_ms": 1234
+}
+```
+
+## NAK errors
+
+The ESP32 returns a NAK for malformed JSON, missing version, unsupported
+version, missing sequence, missing command, unknown command, and oversized
+input lines.
+
+```json
+{"version":1,"sequence":0,"status":"nak","error":"malformed_json"}
+```
+
+When the ESP32 cannot recover a request sequence, `sequence` is `0`;
+otherwise the NAK echoes the request sequence.
 
 ## Message categories
 
 | Category | Direction | Purpose |
 |---|---|---|
-| Discovery | Pi → ESP32 → Pi | Identify firmware version, chip info, capabilities |
-| Configuration | Pi → ESP32 | Set timing/gain/topology parameters before arming |
-| Arm / Start / Stop | Pi → ESP32 | Session lifecycle control |
-| Heartbeat | Pi ↔ ESP32 | Liveness; ESP32 enters safe state on heartbeat timeout |
-| Telemetry | ESP32 → Pi | Status/measurement reporting during a session |
-| Fault reporting | ESP32 → Pi | Watchdog trips, invalid config, hardware faults |
+| Discovery | Pi → ESP32 → Pi | Implemented as `hello` |
+| Status | Pi → ESP32 → Pi | Implemented as `get_status` |
+| Heartbeat | Pi ↔ ESP32 | Implemented as one safe liveness echo |
+| Configuration | Pi → ESP32 | Not implemented |
+| Arm / Start / Stop | Pi → ESP32 | Not implemented |
+| Telemetry | ESP32 → Pi | Not implemented |
+| Fault reporting | ESP32 → Pi | Not implemented beyond `faults: 0` |
 
 ## Hard invariant
 
@@ -36,7 +137,6 @@ directly by serial packet arrival. See
 
 ## TODO before this protocol is "v1" in fact, not just in name
 
-- Exact message framing and encoding.
-- Full message catalog with field-level definitions.
-- Versioning/compatibility strategy between Pi client and ESP32 firmware.
+- Full message catalog with field-level definitions for configuration,
+  session lifecycle, telemetry, and faults.
 - Error/fault code catalog (cross-reference with `state-machine.md`).

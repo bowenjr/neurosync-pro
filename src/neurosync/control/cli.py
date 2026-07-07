@@ -1,15 +1,10 @@
-"""NeuroSync Pro CLI.
-
-Every command here is read-only: nothing enables a hardware output, opens a
-serial port for writing, or changes system state. Flashing and deployment
-are handled by the shell scripts under `scripts/`, gated behind explicit
-`--confirm` flags, not by this CLI.
-"""
+"""NeuroSync Pro CLI."""
 
 from __future__ import annotations
 
 import platform
 import sys
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -21,8 +16,9 @@ from neurosync.control.hardware_discovery import (
     list_audio_devices,
     list_serial_ports,
 )
+from neurosync.control.serial_link import ControllerClient, SerialProtocolError
 
-app = typer.Typer(help="NeuroSync Pro — read-only diagnostic CLI.")
+app = typer.Typer(help="NeuroSync Pro diagnostic CLI.")
 console = Console()
 
 
@@ -82,6 +78,65 @@ def serial_list() -> None:
             p.device, p.description, vid_pid, p.serial_number or "-", p.manufacturer or "-"
         )
     console.print(table)
+
+
+def _controller_client(port: str, timeout: float) -> ControllerClient:
+    return ControllerClient(port=port, timeout=timeout)
+
+
+def _print_controller_response(title: str, response: dict[str, Any]) -> None:
+    table = Table(title=title)
+    table.add_column("Field")
+    table.add_column("Value")
+    for key, value in response.items():
+        if isinstance(value, dict):
+            table.add_row(key, ", ".join(f"{k}={v}" for k, v in value.items()))
+        else:
+            table.add_row(key, str(value))
+    console.print(table)
+
+
+def _run_controller_command(command: str, port: str, timeout: float) -> None:
+    client = _controller_client(port, timeout)
+    try:
+        if command == "hello":
+            response = client.hello()
+        elif command == "get_status":
+            response = client.get_status()
+        elif command == "heartbeat":
+            response = client.heartbeat()
+        else:
+            raise RuntimeError(f"unsupported controller CLI command: {command}")
+    except SerialProtocolError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _print_controller_response(command, response)
+
+
+@app.command("controller-hello")
+def controller_hello(
+    port: str = typer.Option(..., "--port", help="Serial device, e.g. /dev/ttyUSB0"),
+    timeout: float = typer.Option(1.0, "--timeout", min=0.1, help="Read timeout in seconds"),
+) -> None:
+    """Send a safe hello request to the ESP32 controller."""
+    _run_controller_command("hello", port, timeout)
+
+
+@app.command("controller-status")
+def controller_status(
+    port: str = typer.Option(..., "--port", help="Serial device, e.g. /dev/ttyUSB0"),
+    timeout: float = typer.Option(1.0, "--timeout", min=0.1, help="Read timeout in seconds"),
+) -> None:
+    """Read the ESP32 controller safe status."""
+    _run_controller_command("get_status", port, timeout)
+
+
+@app.command("controller-heartbeat")
+def controller_heartbeat(
+    port: str = typer.Option(..., "--port", help="Serial device, e.g. /dev/ttyUSB0"),
+    timeout: float = typer.Option(1.0, "--timeout", min=0.1, help="Read timeout in seconds"),
+) -> None:
+    """Send one safe heartbeat request to the ESP32 controller."""
+    _run_controller_command("heartbeat", port, timeout)
 
 
 @app.command("audio-list")

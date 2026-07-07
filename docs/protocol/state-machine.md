@@ -1,8 +1,11 @@
 # ESP32 state machine
 
-Status: **draft / placeholder**, to be refined alongside `protocol-v1.md`
-and the firmware in `firmware/esp32/`. Keep this document, the firmware,
-the Pi client, and any simulator updated together (`AGENTS.md`).
+Status: **milestone 1 / safe discovery only**. Keep this document, the
+firmware, the Pi client, and any simulator updated together (`AGENTS.md`).
+
+Milestone 1 implements only the `SAFE` state surfaced over USB serial by
+`hello`, `get_status`, and `heartbeat`. The broader lifecycle below is the
+intended future shape, but no command currently transitions out of `SAFE`.
 
 ## States
 
@@ -11,7 +14,7 @@ the Pi client, and any simulator updated together (`AGENTS.md`).
          │
          ▼
   ┌─────────────┐   fault / heartbeat timeout   ┌────────────┐
-  │  SAFE_IDLE   │◄──────────────────────────────│  FAULTED   │
+  │    SAFE      │◄──────────────────────────────│  FAULTED   │
   └──────┬───────┘                               └─────▲──────┘
          │ configure                                    │ fault
          ▼                                               │
@@ -30,13 +33,18 @@ the Pi client, and any simulator updated together (`AGENTS.md`).
 
 ## Rules
 
-- **`SAFE_IDLE` is the boot state and the only state in which the firmware
+- **`SAFE` is the boot state and the only state in which the firmware
   is guaranteed to have just forced outputs off.** `GPIO23` (output enable)
   is held low before any other peripheral is configured.
+- In milestone 1, `hello`, `get_status`, and `heartbeat` all preserve
+  `SAFE`, report `output_enable: false`, and perform no GPIO, DAC, ADC,
+  PWM, MCPWM, LED, haptic, Wi-Fi, Bluetooth, or current-source action.
+- The firmware verifies `GPIO23` is low before and after protocol command
+  handling. Dynamic protocol commands do not modify GPIO configuration.
 - Any fault (watchdog trip, heartbeat timeout, invalid configuration
   detected in hardware, out-of-range parameter) transitions immediately to
   `FAULTED`, which forces the safe state and requires an explicit
-  Pi-initiated reset back to `SAFE_IDLE` — faults are never auto-cleared.
+  Pi-initiated reset back to `SAFE` — faults are never auto-cleared.
 - `CONFIGURED` and `ARMED` do not themselves enable outputs; only
   `RUNNING` does, and only for parameters that were validated during
   `CONFIGURED`.
