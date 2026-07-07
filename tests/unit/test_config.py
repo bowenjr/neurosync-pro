@@ -6,6 +6,7 @@ from neurosync.control.config import load_config
 def test_load_config_defaults_when_no_env_file(tmp_path: Path) -> None:
     cfg = load_config(env_file=tmp_path / "missing.env")
     assert cfg.pi_host == "neurosync-pi"
+    assert cfg.pi_hostname == "10.0.0.127"
     assert cfg.esp32_target == "esp32"
     assert cfg.esp32_port == "auto"
 

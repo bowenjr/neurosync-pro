@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Parser-level checks for Makefile boolean control variables. Uses make -n
-# only; no deploy, flash, SSH, or hardware command is executed.
+# Parser-level checks for Makefile boolean control variables plus local,
+# non-destructive deployment workflow checks. No deploy, flash, SSH, or
+# hardware command is executed.
 set -euo pipefail
 
 # shellcheck source=scripts/common/lib.sh
@@ -45,6 +46,34 @@ require_failure() {
   printf '%s\n' "$output"
 }
 
+require_command_failure() {
+  local name="$1"
+  shift
+  local output
+  if output="$("$@" 2>&1)"; then
+    ns_log_err "$name: expected command to fail"
+    printf '%s\n' "$output" >&2
+    exit 1
+  fi
+  printf '%s\n' "$output"
+}
+
+require_file_contains() {
+  local name="$1" file="$2" needle="$3"
+  if ! grep -Fq -- "$needle" "$file"; then
+    ns_log_err "$name: expected $file to contain '$needle'"
+    exit 1
+  fi
+}
+
+require_file_not_contains() {
+  local name="$1" file="$2" needle="$3"
+  if grep -Fq -- "$needle" "$file"; then
+    ns_log_err "$name: $file must not contain '$needle'"
+    exit 1
+  fi
+}
+
 out="$(require_success "FORCE_DIRTY empty" esp32-flash CONFIRM=YES FORCE_DIRTY=)"
 require_not_contains "FORCE_DIRTY empty" "$out" "--force-dirty"
 
@@ -60,6 +89,18 @@ require_contains "FORCE_DIRTY YES" "$out" "--force-dirty"
 out="$(require_failure "FORCE_DIRTY garbage" esp32-flash CONFIRM=YES FORCE_DIRTY=garbage)"
 require_contains "FORCE_DIRTY garbage" "$out" "FORCE_DIRTY must be empty or one of"
 
+out="$(require_success "pi-deploy FORCE_DIRTY empty" pi-deploy CONFIRM=YES FORCE_DIRTY=)"
+require_not_contains "pi-deploy FORCE_DIRTY empty" "$out" "--force-dirty"
+
+out="$(require_success "pi-deploy FORCE_DIRTY 0" pi-deploy CONFIRM=YES FORCE_DIRTY=0)"
+require_not_contains "pi-deploy FORCE_DIRTY 0" "$out" "--force-dirty"
+
+out="$(require_success "pi-deploy FORCE_DIRTY YES" pi-deploy CONFIRM=YES FORCE_DIRTY=YES)"
+require_contains "pi-deploy FORCE_DIRTY YES" "$out" "--force-dirty"
+
+out="$(require_failure "pi-deploy FORCE_DIRTY garbage" pi-deploy CONFIRM=YES FORCE_DIRTY=garbage)"
+require_contains "pi-deploy FORCE_DIRTY garbage" "$out" "FORCE_DIRTY must be empty or one of"
+
 out="$(require_success "RESTART 0" pi-deploy CONFIRM=YES RESTART=0)"
 require_not_contains "RESTART 0" "$out" "--restart"
 
@@ -71,6 +112,35 @@ require_contains "CONFIRM NO" "$out" "pi-deploy requires affirmative CONFIRM"
 
 out="$(require_success "CONFIRM YES" pi-deploy CONFIRM=YES)"
 require_contains "CONFIRM YES" "$out" "scripts/pi/deploy.sh --confirm"
+
+dirty_marker="$repo_root/.validate-pi-deploy-dirty.tmp"
+cleanup() {
+  rm -f "$dirty_marker"
+}
+trap cleanup EXIT
+printf 'temporary validation marker\n' >"$dirty_marker"
+
+out="$(require_command_failure "dirty deploy refused" "$repo_root/scripts/pi/deploy.sh" --confirm)"
+require_contains "dirty deploy refused" "$out" "Refusing to deploy dirty working tree"
+require_not_contains "dirty deploy refused" "$out" "Checking reachability"
+cleanup
+
+require_file_contains "deploy remote uv" "$repo_root/scripts/pi/deploy.sh" 'remote_uv="/home/bowen/.local/bin/uv"'
+require_file_contains "deploy remote uv sync" "$repo_root/scripts/pi/deploy.sh" "\"\$2\" sync --locked"
+require_file_contains "deploy remote uv pytest" "$repo_root/scripts/pi/deploy.sh" "\"\$2\" run pytest tests/unit -q"
+if grep -Eq '^[[:space:]]*(rsync .*--delete|--delete)' "$repo_root/scripts/pi/deploy.sh"; then
+  ns_log_err "deploy rsync no delete: rsync command must not use --delete"
+  exit 1
+fi
+require_file_not_contains "deploy rsync no gitignore negation" "$repo_root/scripts/pi/deploy.sh" "!config/*.env.example"
+
+out="$(require_success "pi-verify read-only target" pi-verify)"
+require_contains "pi-verify read-only target" "$out" "scripts/pi/verify.sh"
+require_file_not_contains "pi-verify no rsync" "$repo_root/scripts/pi/verify.sh" "rsync"
+require_file_not_contains "pi-verify no package install" "$repo_root/scripts/pi/verify.sh" "apt"
+require_file_not_contains "pi-verify no uv sync" "$repo_root/scripts/pi/verify.sh" "sync --locked"
+require_file_not_contains "pi-verify no remote mkdir" "$repo_root/scripts/pi/verify.sh" "mkdir"
+require_file_not_contains "pi-verify no remote touch" "$repo_root/scripts/pi/verify.sh" "touch"
 
 out="$(require_success "pi-inventory read-only" pi-inventory)"
 require_contains "pi-inventory read-only" "$out" "scripts/pi/inventory.sh"

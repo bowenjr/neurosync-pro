@@ -24,7 +24,7 @@ ns_load_hardware_env() {
     set +a
   fi
   : "${NEUROSYNC_PI_HOST:=neurosync-pi}"
-  : "${NEUROSYNC_PI_HOSTNAME:=neurosync-pi.local}"
+  : "${NEUROSYNC_PI_HOSTNAME:=10.0.0.127}"
   : "${NEUROSYNC_PI_USER:=bowen}"
   : "${NEUROSYNC_PI_PATH:=/home/bowen/apps/neurosync-pro}"
   : "${NEUROSYNC_ESP32_TARGET:=esp32}"

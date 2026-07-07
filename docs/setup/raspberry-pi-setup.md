@@ -2,7 +2,7 @@
 
 Target: **Raspberry Pi 3** (not Pi 5 — see
 `docs/architecture/raspberry-pi-3-deviation.md`), SSH alias `neurosync-pi`,
-hostname `neurosync-pi.local`, user `bowen`, app path
+current alias address `10.0.0.127`, user `bowen`, app path
 `/home/bowen/apps/neurosync-pro`.
 
 ## Status as of the initial setup run (2026-07-07)

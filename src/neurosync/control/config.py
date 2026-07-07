@@ -18,7 +18,7 @@ _ENV_PREFIX = "NEUROSYNC_"
 
 _DEFAULTS: dict[str, str] = {
     "PI_HOST": "neurosync-pi",
-    "PI_HOSTNAME": "neurosync-pi.local",
+    "PI_HOSTNAME": "10.0.0.127",
     "PI_USER": "bowen",
     "PI_PATH": "/home/bowen/apps/neurosync-pro",
     "ESP32_TARGET": "esp32",

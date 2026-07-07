@@ -1,5 +1,5 @@
 .PHONY: doctor lint typecheck test check validate-make-booleans \
-        pi-status pi-inventory pi-inventory-save pi-bootstrap pi-deploy pi-test pi-logs pi-shell \
+        pi-status pi-verify pi-inventory pi-inventory-save pi-bootstrap pi-deploy pi-test pi-logs pi-shell \
         esp32-detect esp32-build esp32-chip-info esp32-flash esp32-monitor esp32-flash-monitor
 
 BOOL_TRUE_VALUES := YES 1 TRUE true
@@ -36,11 +36,14 @@ validate-make-booleans:
 	scripts/doctor/validate-make-booleans.sh
 
 # --- Raspberry Pi -------------------------------------------------------
-# pi-status, pi-inventory, pi-test are read-only / non-destructive.
+# pi-status, pi-verify, pi-inventory, pi-test are read-only / non-destructive.
 # pi-inventory-save, pi-bootstrap, and pi-deploy require CONFIRM=YES.
 
 pi-status:
 	scripts/pi/status.sh
+
+pi-verify:
+	scripts/pi/verify.sh
 
 pi-inventory:
 	scripts/pi/inventory.sh
@@ -61,7 +64,7 @@ pi-deploy:
 ifeq ($(call bool_true,CONFIRM),)
 	$(error pi-deploy requires affirmative CONFIRM=YES/1/TRUE/true, e.g. make pi-deploy CONFIRM=YES)
 endif
-	scripts/pi/deploy.sh --confirm $(if $(call bool_true,RESTART),--restart,)
+	scripts/pi/deploy.sh --confirm $(if $(call bool_true,RESTART),--restart,) $(if $(call bool_true,FORCE_DIRTY),--force-dirty,)
 
 pi-test:
 	scripts/pi/test.sh

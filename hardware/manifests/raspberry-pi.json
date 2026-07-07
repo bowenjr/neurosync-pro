@@ -1,0 +1,11 @@
+{
+  "raspberry_pi": {
+    "model": "Raspberry Pi 3 Model B Rev 1.2",
+    "os": "Debian GNU/Linux 13 (trixie)",
+    "architecture": "aarch64",
+    "python_version": "Python 3.13.5",
+    "memory_mb": 905,
+    "storage_root": "/dev/mmcblk0p2   29G  3.0G   25G  11% /",
+    "detected_at": "2026-07-07T17:17:38Z"
+  }
+}
