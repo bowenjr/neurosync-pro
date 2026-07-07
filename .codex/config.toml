@@ -1,0 +1,9 @@
+# NeuroSync Pro — project-scoped Codex configuration.
+# See AGENTS.md for the operating rules this config supports (build freely,
+# flash/deploy only with explicit human approval, no destructive ops).
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = true

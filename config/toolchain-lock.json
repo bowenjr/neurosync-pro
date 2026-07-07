@@ -1,0 +1,11 @@
+{
+  "esp_idf": {
+    "selected_tag": "v5.5.4",
+    "selection_rule": "highest stable non-RC v5.x tag on espressif/esp-idf at setup time",
+    "clone_path": "~/esp/esp-idf-5.5.4",
+    "current_symlink": "~/esp/esp-idf-current",
+    "installed_targets": ["esp32"],
+    "install_date": "2026-07-07",
+    "install_status": "toolchain downloaded; install.sh did not complete (blocked on missing libusb-1.0-0 system package, requires sudo apt-get install). Re-run ~/esp/esp-idf-current/install.sh esp32 after installing prerequisites."
+  }
+}

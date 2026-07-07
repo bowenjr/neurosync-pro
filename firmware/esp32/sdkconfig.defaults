@@ -1,0 +1,19 @@
+# NeuroSync Pro diagnostic firmware — baseline sdkconfig defaults.
+# Applied via `idf.py set-target esp32` + `idf.py build`; the generated
+# sdkconfig file itself is gitignored (machine/build-local).
+
+# Target
+CONFIG_IDF_TARGET="esp32"
+
+# No Wi-Fi, no Bluetooth for this diagnostic build.
+CONFIG_ESP_WIFI_ENABLED=n
+CONFIG_BT_ENABLED=n
+
+# On panic, halt rather than reboot into an unknown state. Safe state is
+# re-established at the top of app_main on every boot regardless, but
+# halting on panic keeps a faulting build from looping.
+CONFIG_ESP_SYSTEM_PANIC_PRINT_HALT=y
+
+# Console over the primary UART at a conventional rate.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200

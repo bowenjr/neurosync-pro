@@ -1,0 +1,19 @@
+{
+  "_comment": "Template only. Real manifests are written to hardware/manifests/ by scripts/pi/bootstrap.sh and are machine-specific, not hand-edited.",
+  "raspberry_pi": {
+    "model": "TODO",
+    "os": "TODO",
+    "architecture": "TODO",
+    "python_version": "TODO",
+    "memory_mb": "TODO",
+    "storage_gb": "TODO",
+    "detected_at": "TODO"
+  },
+  "esp32": {
+    "target": "esp32",
+    "chip_model": "TODO",
+    "chip_revision": "TODO",
+    "flash_size": "TODO",
+    "port": "TODO"
+  }
+}

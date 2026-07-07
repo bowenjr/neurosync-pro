@@ -1,0 +1,17 @@
+# Template only — not installed by this setup run. install-services.sh
+# copies this to the Pi's user systemd directory once real application
+# entry points exist. NEUROSYNC_PI_PATH is substituted at install time.
+[Unit]
+Description=NeuroSync Pro supervisory application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__NEUROSYNC_PI_PATH__
+ExecStart=%h/.local/bin/uv run neurosync-supervisor
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

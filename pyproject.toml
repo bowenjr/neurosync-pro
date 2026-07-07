@@ -1,0 +1,52 @@
+[project]
+name = "neurosync-pro"
+version = "0.1.0"
+description = "Instrumented bench-learning platform (Armoury / Raspberry Pi 3 / ESP32). No biological connection or use."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2",
+    "pyserial>=3.5",
+    "platformdirs>=4",
+    "typer>=0.12",
+    "rich>=13",
+]
+
+[project.scripts]
+neurosync = "neurosync.control.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/neurosync"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "mypy>=1.10",
+    "ruff>=0.6",
+    "types-pyserial",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+
+[tool.neurosync]
+# Project-scoped runtime config; overridden by ~/.config/neurosync/hardware.env
+pi_host = "neurosync-pi"
+esp32_target = "esp32"

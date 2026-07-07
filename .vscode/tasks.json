@@ -1,0 +1,75 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "doctor",
+      "type": "shell",
+      "command": "make doctor",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "lint",
+      "type": "shell",
+      "command": "make lint",
+      "group": "test",
+      "problemMatcher": ["$eslint-compact"]
+    },
+    {
+      "label": "typecheck",
+      "type": "shell",
+      "command": "make typecheck",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "make test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "check (lint+typecheck+test)",
+      "type": "shell",
+      "command": "make check",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "pi: status",
+      "type": "shell",
+      "command": "make pi-status",
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "pi: inventory",
+      "type": "shell",
+      "command": "make pi-inventory",
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "esp32: detect",
+      "type": "shell",
+      "command": "make esp32-detect",
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "esp32: build",
+      "type": "shell",
+      "command": "make esp32-build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "esp32: chip-info",
+      "type": "shell",
+      "command": "make esp32-chip-info",
+      "group": "none",
+      "problemMatcher": []
+    }
+  ]
+}
