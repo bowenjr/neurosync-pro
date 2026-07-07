@@ -11,6 +11,7 @@ explicitly by a caller.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Protocol
@@ -20,6 +21,7 @@ import serial
 PROTOCOL_VERSION = 1
 DEFAULT_BAUDRATE = 115200
 MAX_INPUT_LINE_LENGTH = 512
+DEFAULT_STARTUP_DELAY = 2.0
 
 
 class SerialProtocolError(RuntimeError):
@@ -37,6 +39,7 @@ class SerialResponseError(SerialProtocolError):
 class LineLink(Protocol):
     def open(self) -> None: ...
     def close(self) -> None: ...
+    def prepare_for_request(self) -> None: ...
     def write_line(self, line: str) -> None: ...
     def read_line(self) -> str | None: ...
 
@@ -44,25 +47,41 @@ class LineLink(Protocol):
 class SerialLink:
     """Line-oriented serial connection. Caller controls open/close explicitly."""
 
-    def __init__(self, port: str, baudrate: int = DEFAULT_BAUDRATE, timeout: float = 1.0) -> None:
+    def __init__(
+        self,
+        port: str,
+        baudrate: int = DEFAULT_BAUDRATE,
+        timeout: float = 1.0,
+        startup_delay: float = DEFAULT_STARTUP_DELAY,
+        sleep_func: Callable[[float], None] = time.sleep,
+    ) -> None:
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.startup_delay = startup_delay
+        self._sleep = sleep_func
         self._conn: serial.Serial | None = None
 
     def open(self) -> None:
         if self._conn is not None and self._conn.is_open:
             return
-        self._conn = serial.Serial(
-            port=self.port,
-            baudrate=self.baudrate,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=self.timeout,
-        )
+        self._conn = serial.Serial()
+        self._conn.port = self.port
+        self._conn.baudrate = self.baudrate
+        self._conn.bytesize = serial.EIGHTBITS
+        self._conn.parity = serial.PARITY_NONE
+        self._conn.stopbits = serial.STOPBITS_ONE
+        self._conn.timeout = self.timeout
+        self._conn.dtr = False
+        self._conn.rts = False
+        self._conn.open()
+
+    def prepare_for_request(self) -> None:
+        if self._conn is None or not self._conn.is_open:
+            raise RuntimeError("SerialLink is not open; call open() first")
+        if self.startup_delay > 0:
+            self._sleep(self.startup_delay)
         self._conn.reset_input_buffer()
-        self._conn.reset_output_buffer()
 
     def close(self) -> None:
         if self._conn is not None:
@@ -108,12 +127,17 @@ class ControllerClient:
         *,
         baudrate: int = DEFAULT_BAUDRATE,
         timeout: float = 1.0,
-        link_factory: Callable[[str, int, float], LineLink] | None = None,
+        startup_delay: float = DEFAULT_STARTUP_DELAY,
+        clock: Callable[[], float] = time.monotonic,
+        link_factory: Callable[[str, int, float, float], LineLink] | None = None,
     ) -> None:
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.startup_delay = startup_delay
+        self.ignored_lines: list[str] = []
         self._next_sequence = 1
+        self._clock = clock
         self._link_factory = link_factory or SerialLink
 
     def hello(self) -> dict[str, Any]:
@@ -134,19 +158,38 @@ class ControllerClient:
             "command": command,
         }
         line = json.dumps(request, separators=(",", ":"))
-        link = self._link_factory(self.port, self.baudrate, self.timeout)
+        link = self._link_factory(self.port, self.baudrate, self.timeout, self.startup_delay)
         link.open()
         try:
+            link.prepare_for_request()
             link.write_line(line)
-            response_line = link.read_line()
+            return self._read_matching_response(link, sequence, command)
         finally:
             link.close()
-        if response_line is None:
-            raise SerialTimeoutError(f"timed out waiting for {command} response on {self.port}")
-        return validate_controller_response(response_line, sequence, command)
+
+    def _read_matching_response(
+        self, link: LineLink, sequence: int, command: str
+    ) -> dict[str, Any]:
+        deadline = self._clock() + self.timeout
+        while self._clock() < deadline:
+            response_line = link.read_line()
+            if response_line is None:
+                continue
+            try:
+                response = parse_controller_response(response_line)
+            except SerialResponseError:
+                self.ignored_lines.append(response_line)
+                continue
+            return validate_controller_response_object(response, sequence, command)
+        raise SerialTimeoutError(f"timed out waiting for {command} response on {self.port}")
 
 
 def validate_controller_response(line: str, sequence: int, command: str) -> dict[str, Any]:
+    response = parse_controller_response(line)
+    return validate_controller_response_object(response, sequence, command)
+
+
+def parse_controller_response(line: str) -> dict[str, Any]:
     if len(line.encode("utf-8")) > MAX_INPUT_LINE_LENGTH:
         raise SerialResponseError("response line exceeded 512 bytes")
     try:
@@ -155,6 +198,12 @@ def validate_controller_response(line: str, sequence: int, command: str) -> dict
         raise SerialResponseError(f"invalid JSON response: {exc.msg}") from exc
     if not isinstance(response, dict):
         raise SerialResponseError("response JSON must be an object")
+    return response
+
+
+def validate_controller_response_object(
+    response: dict[str, Any], sequence: int, command: str
+) -> dict[str, Any]:
     if response.get("sequence") != sequence:
         raise SerialResponseError(
             f"sequence mismatch: expected {sequence}, got {response.get('sequence')!r}"
