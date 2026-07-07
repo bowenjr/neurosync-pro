@@ -28,6 +28,11 @@ watchdogs, heartbeat supervision, and fault shutdown. It runs
 Wi-Fi-and-Bluetooth-free, so its only extra-chip communication channel is
 the USB serial link to the Pi.
 
+Milestone 1 of that link is safe discovery/status only: UART0 over the
+CP2102 bridge at 115200 8N1, newline-delimited JSON, and only `hello`,
+`get_status`, and `heartbeat`. These commands report `SAFE` and
+`output_enable: false`; they do not configure or energize any output.
+
 ## Why USB serial is a control channel, not a data-rate channel
 
 The Pi-to-ESP32 link is used for discovery, configuration, arm/start/stop,
