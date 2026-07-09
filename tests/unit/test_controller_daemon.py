@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+import neurosync.controller.daemon as daemon_module
 from neurosync.control.serial_link import DEFAULT_BAUDRATE, SerialResponseError, SerialTimeoutError
 from neurosync.controller.ipc import request as ipc_request
 from neurosync.controller.ipc import serve_ipc
@@ -153,6 +154,23 @@ def wait_for(predicate: Callable[[], bool], timeout: float = 1.0) -> None:
             return
         time.sleep(0.005)
     raise AssertionError("condition was not met")
+
+
+def wait_for_socket(socket_path: Path, timeout: float = 3.0) -> None:
+    deadline = time.monotonic() + timeout
+    last_error: OSError | None = None
+    while time.monotonic() < deadline:
+        if socket_path.exists():
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                client.settimeout(0.1)
+                try:
+                    client.connect(str(socket_path))
+                except OSError as exc:
+                    last_error = exc
+                else:
+                    return
+        time.sleep(0.01)
+    raise AssertionError(f"daemon socket was not ready at {socket_path}: {last_error}")
 
 
 def test_daemon_starts_with_no_esp32_and_reconnects_after_absence() -> None:
@@ -302,13 +320,58 @@ def test_graceful_sigterm_shutdown(tmp_path: Path) -> None:
     )
     proc = subprocess.Popen([sys.executable, "-c", code])
     try:
-        time.sleep(0.2)
+        wait_for_socket(socket_path)
         proc.send_signal(signal.SIGTERM)
         proc.wait(timeout=3)
         assert proc.returncode == 0
+        assert not socket_path.exists()
     finally:
         if proc.poll() is None:
             proc.kill()
+            proc.wait(timeout=3)
+
+
+def test_signal_handler_is_installed_before_daemon_initialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[str] = []
+
+    class FakeDaemon:
+        def __init__(self, *, serial_port: str, socket_path: str) -> None:
+            events.append(f"init:{serial_port}:{socket_path}")
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        def start(self) -> None:
+            events.append("start")
+
+        def stop(self) -> None:
+            events.append("stop")
+
+    class FakeServer:
+        def handle_request(self) -> None:
+            events.append("handle_request")
+
+        def server_close(self) -> None:
+            events.append("server_close")
+
+    def fake_serve_ipc(_daemon: FakeDaemon, _socket_path: str) -> FakeServer:
+        events.append("serve_ipc")
+        return FakeServer()
+
+    monkeypatch.setattr(daemon_module, "ControllerDaemon", FakeDaemon)
+    monkeypatch.setattr(daemon_module, "serve_ipc", fake_serve_ipc)
+
+    daemon_module.run_daemon(
+        serial_port="/dev/neurosync-missing",
+        socket_path=str(tmp_path / "controller.sock"),
+    )
+
+    assert events == [
+        f"init:/dev/neurosync-missing:{tmp_path / 'controller.sock'}",
+        "serve_ipc",
+        "stop",
+        "server_close",
+    ]
 
 
 def test_stale_socket_cleanup(tmp_path: Path) -> None:
