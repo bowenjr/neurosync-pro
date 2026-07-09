@@ -20,8 +20,8 @@ repository. In summary, it covers:
 
 - `docs/architecture/system-architecture.md` — how Armoury, the Pi, and the
   ESP32 divide responsibility, and how the USB serial link connects them.
-- `docs/architecture/raspberry-pi-3-deviation.md` — where this project's
-  assumptions differ because the target is a Pi 3, not a Pi 5.
+- `docs/architecture/raspberry-pi-3-deviation.md` — why this project uses
+  the verified Pi 3 target as its documented hardware deviation.
 - `docs/architecture/trust-boundaries.md` — what each side of a boundary is
   allowed to assume about the other.
 - `docs/protocol/protocol-v1.md` and `docs/protocol/state-machine.md` — the

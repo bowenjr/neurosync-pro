@@ -7,10 +7,10 @@
  * to go through this single header (with compile-time collision checks)
  * rather than being scattered through the firmware.
  *
- * TODO: replace with the real pin assignments during hardware bring-up.
- * Until then, DAC1/DAC2 (GPIO25/26) and two placeholder MCPWM-candidate
- * pins (GPIO32/33) are treated as plain digital outputs held low — this
- * firmware never configures them as DAC or PWM peripherals.
+ * TODO: replace with the final schematic-derived pin assignments during
+ * hardware bring-up. Until then, all named output pins are treated as plain
+ * digital outputs held low — this firmware never configures them as DAC,
+ * ADC, PWM, MCPWM, or trigger peripherals.
  */
 #pragma once
 
@@ -20,20 +20,31 @@
 /* Hard output-enable line. Held low before anything else at boot. */
 #define NSP_GPIO_OUTPUT_ENABLE GPIO_NUM_23
 
-/* Placeholder intended-output pins, held low as plain GPIO outputs. */
+/* Rev 5.4 intended-output pins, held low as plain GPIO outputs. */
 #define NSP_GPIO_DAC1 GPIO_NUM_25
 #define NSP_GPIO_DAC2 GPIO_NUM_26
-#define NSP_GPIO_PWM_A GPIO_NUM_32
-#define NSP_GPIO_PWM_B GPIO_NUM_33
+#define NSP_GPIO_SYNC GPIO_NUM_19
+#define NSP_GPIO_OPTICAL_PWM GPIO_NUM_18
+#define NSP_GPIO_HAPTIC_TRIG GPIO_NUM_27
+
+/*
+ * Rev 5.4 current-sink sense pins. GPIO32/33 are input-only-capable ADC1
+ * pins, but for the current safe-state-only firmware they are still driven
+ * low as plain outputs. This must change when ADC capture is implemented:
+ * an ADC input pin must not remain configured as a driven output.
+ */
+#define NSP_GPIO_CURRENT_SINK_SENSE_A GPIO_NUM_32
+#define NSP_GPIO_CURRENT_SINK_SENSE_B GPIO_NUM_33
 
 /* Every GPIO this firmware forces low at boot and holds low thereafter. */
-#define NSP_SAFE_LOW_GPIO_LIST                                               \
-    {                                                                        \
-        NSP_GPIO_OUTPUT_ENABLE, NSP_GPIO_DAC1, NSP_GPIO_DAC2, NSP_GPIO_PWM_A, \
-            NSP_GPIO_PWM_B                                                   \
+#define NSP_SAFE_LOW_GPIO_LIST                                                        \
+    {                                                                                 \
+        NSP_GPIO_OUTPUT_ENABLE, NSP_GPIO_DAC1, NSP_GPIO_DAC2, NSP_GPIO_SYNC,          \
+            NSP_GPIO_OPTICAL_PWM, NSP_GPIO_HAPTIC_TRIG,                               \
+            NSP_GPIO_CURRENT_SINK_SENSE_A, NSP_GPIO_CURRENT_SINK_SENSE_B              \
     }
 
-#define NSP_SAFE_LOW_GPIO_COUNT 5
+#define NSP_SAFE_LOW_GPIO_COUNT 8
 
 /* Compile-time pin map sanity checks. */
 _Static_assert(NSP_GPIO_OUTPUT_ENABLE == GPIO_NUM_23,
@@ -41,19 +52,44 @@ _Static_assert(NSP_GPIO_OUTPUT_ENABLE == GPIO_NUM_23,
 
 _Static_assert(NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_DAC1 &&
                    NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_DAC2 &&
-                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_PWM_A &&
-                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_PWM_B,
+                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_SYNC &&
+                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_OPTICAL_PWM &&
+                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_HAPTIC_TRIG &&
+                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_CURRENT_SINK_SENSE_A &&
+                   NSP_GPIO_OUTPUT_ENABLE != NSP_GPIO_CURRENT_SINK_SENSE_B,
                "output-enable pin must not collide with any other safe-low pin");
 
-_Static_assert(NSP_GPIO_DAC1 != NSP_GPIO_DAC2 && NSP_GPIO_DAC1 != NSP_GPIO_PWM_A &&
-                   NSP_GPIO_DAC1 != NSP_GPIO_PWM_B,
+_Static_assert(NSP_GPIO_DAC1 != NSP_GPIO_DAC2 && NSP_GPIO_DAC1 != NSP_GPIO_SYNC &&
+                   NSP_GPIO_DAC1 != NSP_GPIO_OPTICAL_PWM &&
+                   NSP_GPIO_DAC1 != NSP_GPIO_HAPTIC_TRIG &&
+                   NSP_GPIO_DAC1 != NSP_GPIO_CURRENT_SINK_SENSE_A &&
+                   NSP_GPIO_DAC1 != NSP_GPIO_CURRENT_SINK_SENSE_B,
                "NSP_GPIO_DAC1 collides with another safe-low pin");
 
-_Static_assert(NSP_GPIO_DAC2 != NSP_GPIO_PWM_A && NSP_GPIO_DAC2 != NSP_GPIO_PWM_B,
+_Static_assert(NSP_GPIO_DAC2 != NSP_GPIO_SYNC &&
+                   NSP_GPIO_DAC2 != NSP_GPIO_OPTICAL_PWM &&
+                   NSP_GPIO_DAC2 != NSP_GPIO_HAPTIC_TRIG &&
+                   NSP_GPIO_DAC2 != NSP_GPIO_CURRENT_SINK_SENSE_A &&
+                   NSP_GPIO_DAC2 != NSP_GPIO_CURRENT_SINK_SENSE_B,
                "NSP_GPIO_DAC2 collides with another safe-low pin");
 
-_Static_assert(NSP_GPIO_PWM_A != NSP_GPIO_PWM_B,
-               "NSP_GPIO_PWM_A collides with NSP_GPIO_PWM_B");
+_Static_assert(NSP_GPIO_SYNC != NSP_GPIO_OPTICAL_PWM &&
+                   NSP_GPIO_SYNC != NSP_GPIO_HAPTIC_TRIG &&
+                   NSP_GPIO_SYNC != NSP_GPIO_CURRENT_SINK_SENSE_A &&
+                   NSP_GPIO_SYNC != NSP_GPIO_CURRENT_SINK_SENSE_B,
+               "NSP_GPIO_SYNC collides with another safe-low pin");
+
+_Static_assert(NSP_GPIO_OPTICAL_PWM != NSP_GPIO_HAPTIC_TRIG &&
+                   NSP_GPIO_OPTICAL_PWM != NSP_GPIO_CURRENT_SINK_SENSE_A &&
+                   NSP_GPIO_OPTICAL_PWM != NSP_GPIO_CURRENT_SINK_SENSE_B,
+               "NSP_GPIO_OPTICAL_PWM collides with another safe-low pin");
+
+_Static_assert(NSP_GPIO_HAPTIC_TRIG != NSP_GPIO_CURRENT_SINK_SENSE_A &&
+                   NSP_GPIO_HAPTIC_TRIG != NSP_GPIO_CURRENT_SINK_SENSE_B,
+               "NSP_GPIO_HAPTIC_TRIG collides with another safe-low pin");
+
+_Static_assert(NSP_GPIO_CURRENT_SINK_SENSE_A != NSP_GPIO_CURRENT_SINK_SENSE_B,
+               "current-sink sense pins must not collide");
 
 /* All pins must be valid, usable-as-output ESP32-WROOM-32 GPIOs (excludes
  * input-only 34-39 and the flash-strapping-sensitive 6-11 range). */
@@ -65,8 +101,13 @@ _Static_assert(NSP_GPIO_PWM_A != NSP_GPIO_PWM_B,
 _Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_OUTPUT_ENABLE), "invalid output GPIO");
 _Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_DAC1), "invalid output GPIO");
 _Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_DAC2), "invalid output GPIO");
-_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_PWM_A), "invalid output GPIO");
-_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_PWM_B), "invalid output GPIO");
+_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_SYNC), "invalid output GPIO");
+_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_OPTICAL_PWM), "invalid output GPIO");
+_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_HAPTIC_TRIG), "invalid output GPIO");
+_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_CURRENT_SINK_SENSE_A),
+               "invalid output GPIO");
+_Static_assert(NSP_IS_VALID_OUTPUT_GPIO(NSP_GPIO_CURRENT_SINK_SENSE_B),
+               "invalid output GPIO");
 
 /*
  * Configures every pin in NSP_SAFE_LOW_GPIO_LIST as a plain digital output

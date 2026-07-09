@@ -214,8 +214,8 @@ fi
 # --- required docs / scripts / permissions --------------------------------
 required_docs=(
   "AGENTS.md" "CLAUDE.md" "README.md"
-  "docs/architecture/system-architecture.md"
   "docs/architecture/raspberry-pi-3-deviation.md"
+  "docs/architecture/system-architecture.md"
   "docs/architecture/trust-boundaries.md"
   "docs/protocol/protocol-v1.md"
   "docs/protocol/state-machine.md"

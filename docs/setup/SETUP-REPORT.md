@@ -42,7 +42,7 @@ Top-level: `AGENTS.md`, `CLAUDE.md`, `README.md`, `Makefile`,
 - `.vscode/{settings,tasks,launch,extensions}.json`
 - `config/hardware.env.example`, `config/hardware_manifest.example.json`,
   `config/toolchain-lock.json`
-- `docs/architecture/{system-architecture,raspberry-pi-3-deviation,trust-boundaries}.md`
+- `docs/architecture/{system-architecture,trust-boundaries}.md`
 - `docs/protocol/{protocol-v1,state-machine}.md`
 - `docs/setup/{system-audit,armoury-setup,raspberry-pi-setup,esp32-setup,codex-direct-control,manual-actions,rollback,SETUP-REPORT}.md`
 - `firmware/esp32/` — `CMakeLists.txt`, `sdkconfig.defaults`,

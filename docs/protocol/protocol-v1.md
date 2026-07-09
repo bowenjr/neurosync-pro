@@ -43,6 +43,51 @@ not implemented in milestone 1. DAC, ADC, PWM, MCPWM, LED, haptic,
 Wi-Fi, Bluetooth, current-source control, and output-enable-high behavior
 are also not implemented.
 
+## Future Rev 5.4 command catalog (not implemented)
+
+This table records the Rev 5.4 Appendix E command catalog so the protocol
+shape is visible, but milestone 1 still implements only `hello`,
+`get_status`, and `heartbeat`. The Pi client, ESP32 firmware, and tests
+must not treat the commands below as available until a later protocol
+change implements them across all consumers.
+
+| Command | Future purpose | Milestone-1 status |
+|---|---|---|
+| `hello` | Identify the controller and disabled capabilities | implemented |
+| `configure` | Load and validate a session configuration | not implemented |
+| `arm` | Prepare a validated configuration for scheduled start | not implemented |
+| `start` | Begin a scheduled or immediate run | not implemented |
+| `stop` | Request ramp-down / stop behavior | not implemented |
+| `get_status` | Report controller state and fault bits | implemented |
+| `clear_fault` | Clear `FAULT` after explicit request and self-test | not implemented |
+| `get_calibration` | Read stored calibration data | not implemented |
+| `set_calibration` | Write calibration data | not implemented |
+| `begin_capture` | Begin a capture window | not implemented |
+| `read_capture` | Read captured samples | not implemented |
+
+`heartbeat` remains a milestone-1 liveness command used by the current
+safe-discovery implementation. It is not an output-control command and
+does not energize any subsystem.
+
+## Future Rev 5.4 fault bits (not implemented)
+
+Fault-bit reporting is reserved for a later protocol milestone. Milestone 1
+continues to report `faults: 0` from `get_status`.
+
+| Bit | Name | Milestone-1 status |
+|---:|---|---|
+| `0x001` | `HEARTBEAT_TIMEOUT` | not implemented |
+| `0x002` | `WATCHDOG_RESET` | not implemented |
+| `0x004` | `ADC_SENSE_HIGH` | not implemented |
+| `0x008` | `COMPLIANCE_LOSS` | not implemented |
+| `0x010` | `INTERLOCK_OPEN` | not implemented |
+| `0x020` | `HAPTIC_DEVICE_MISSING` | not implemented |
+| `0x040` | `ADC_CONFIGURATION_ERROR` | not implemented |
+| `0x080` | `DAC_CONFIGURATION_ERROR` | not implemented |
+| `0x100` | `SERIAL_PROTOCOL_ERROR` | not implemented |
+| `0x200` | `SUPPLY_OUT_OF_RANGE` | not implemented |
+| `0x400` | `INTERNAL_STATE_ERROR` | not implemented |
+
 ## Responses
 
 `hello` response:
