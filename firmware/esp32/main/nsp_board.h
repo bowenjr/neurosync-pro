@@ -8,11 +8,14 @@
  * rather than being scattered through the firmware.
  *
  * TODO: replace with the final schematic-derived pin assignments during
- * hardware bring-up. Until then, all named output pins are treated as plain
- * digital outputs held low — this firmware never configures them as DAC,
- * ADC, PWM, MCPWM, or trigger peripherals.
+ * hardware bring-up. Until then, production-default firmware treats all
+ * named output pins as plain digital outputs held low. The only exception
+ * is the explicit CONFIG_NSP_BENCH_SYNC_40HZ build, where GPIO19 is a
+ * bench-only MCPWM scope reference after SAFE is established.
  */
 #pragma once
+
+#include "sdkconfig.h"
 
 #include "driver/gpio.h"
 #include "esp_err.h"
@@ -37,14 +40,29 @@
 #define NSP_GPIO_CURRENT_SINK_SENSE_B GPIO_NUM_33
 
 /* Every GPIO this firmware forces low at boot and holds low thereafter. */
+#if CONFIG_NSP_BENCH_SYNC_40HZ
+/*
+ * Bench sync builds deliberately reserve GPIO19 for MCPWM after the
+ * firmware has first established SAFE. GPIO23 and every other output still
+ * remain in the static safe-low list.
+ */
+#define NSP_SAFE_LOW_GPIO_LIST                                                        \
+    {                                                                                 \
+        NSP_GPIO_OUTPUT_ENABLE, NSP_GPIO_DAC1, NSP_GPIO_DAC2, NSP_GPIO_OPTICAL_PWM,   \
+            NSP_GPIO_HAPTIC_TRIG, NSP_GPIO_CURRENT_SINK_SENSE_A,                      \
+            NSP_GPIO_CURRENT_SINK_SENSE_B                                             \
+    }
+
+#define NSP_SAFE_LOW_GPIO_COUNT 7
+#else
 #define NSP_SAFE_LOW_GPIO_LIST                                                        \
     {                                                                                 \
         NSP_GPIO_OUTPUT_ENABLE, NSP_GPIO_DAC1, NSP_GPIO_DAC2, NSP_GPIO_SYNC,          \
             NSP_GPIO_OPTICAL_PWM, NSP_GPIO_HAPTIC_TRIG,                               \
             NSP_GPIO_CURRENT_SINK_SENSE_A, NSP_GPIO_CURRENT_SINK_SENSE_B              \
     }
-
 #define NSP_SAFE_LOW_GPIO_COUNT 8
+#endif
 
 /* Compile-time pin map sanity checks. */
 _Static_assert(NSP_GPIO_OUTPUT_ENABLE == GPIO_NUM_23,

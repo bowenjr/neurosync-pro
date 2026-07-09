@@ -1,6 +1,7 @@
 #include "nsp_board.h"
 
 #include "esp_check.h"
+#include "nsp_sync.h"
 
 static const char *TAG = "nsp_safe_state";
 
@@ -29,6 +30,10 @@ esp_err_t nsp_enter_safe_state(void) {
         ESP_RETURN_ON_ERROR(gpio_config(&config), TAG, "configure GPIO%d output low", pin);
         ESP_RETURN_ON_ERROR(gpio_set_level(pin, 0), TAG, "reaffirm GPIO%d low", pin);
     }
+
+#if CONFIG_NSP_BENCH_SYNC_40HZ
+    ESP_RETURN_ON_ERROR(nsp_sync_stop(), TAG, "stop bench sync and return GPIO19 low");
+#endif
 
     return ESP_OK;
 }

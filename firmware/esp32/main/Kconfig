@@ -1,0 +1,14 @@
+menu "NeuroSync Pro bench options"
+
+config NSP_BENCH_SYNC_40HZ
+    bool "Bench-only 40 Hz sync output on GPIO19"
+    default n
+    help
+        Enables a bench image that drives NSP_GPIO_SYNC (GPIO19) with a
+        hardware-timed 40.000 Hz, 50% duty MCPWM square wave after the
+        firmware reaches SAFE.
+
+        This is not production firmware. GPIO23 output-enable remains low,
+        and all non-sync outputs remain in the safe-low list.
+
+endmenu

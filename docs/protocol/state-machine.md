@@ -45,6 +45,14 @@ Rev 5.4 state set, exactly:
 `RESET`, `SAFE`, `CONFIGURED`, `ARMED`, `SCHEDULED`, `RUNNING`,
 `RAMP_DOWN`, `COMPLETE`, `FAULT`.
 
+## Bench-only Phase 2 note
+
+When `CONFIG_NSP_BENCH_SYNC_40HZ` is enabled, the firmware performs a
+bench-only `SAFE` -> `SAFE with bench sync active` transition after boot
+self-test and safe-state initialization. This exists only in bench builds:
+GPIO19 is MCPWM-driven as a scope reference, GPIO23 remains low, all other
+outputs remain safe-low, and the production state machine is unchanged.
+
 ## Rules
 
 - **`RESET` is the boot state. `SAFE` is the first state reached after boot
