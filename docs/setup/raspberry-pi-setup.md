@@ -49,6 +49,27 @@ make pi-logs
 make pi-shell          # interactive SSH shell
 ```
 
+## Persistent controller daemon
+
+Milestone 2 adds one persistent Raspberry Pi controller daemon. It owns
+`/dev/ttyUSB0`, keeps the ESP32 in `SAFE`, and exposes local status through
+newline-delimited JSON on `/run/neurosync/controller.sock`. The future HMI
+must use this Unix socket rather than opening the ESP32 serial device.
+
+Installation and service lifecycle are explicit:
+
+```bash
+make pi-controller-install CONFIRM=YES
+make pi-controller-start CONFIRM=YES
+make pi-controller-status
+make pi-controller-test
+make pi-controller-logs
+make pi-controller-stop CONFIRM=YES
+make pi-controller-restart CONFIRM=YES
+```
+
+No HMI service is installed or enabled by these targets.
+
 ## PiFi audio / touchscreen HMI / GPIO outputs
 
 Explicitly out of scope for this setup run — not configured, not enabled.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import platform
 import sys
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -17,6 +17,9 @@ from neurosync.control.hardware_discovery import (
     list_serial_ports,
 )
 from neurosync.control.serial_link import ControllerClient, SerialProtocolError
+from neurosync.controller.daemon import run_daemon
+from neurosync.controller.ipc import request as ipc_request
+from neurosync.controller.service import DEFAULT_SERIAL_PORT, DEFAULT_SOCKET_PATH
 
 app = typer.Typer(help="NeuroSync Pro diagnostic CLI.")
 console = Console()
@@ -96,6 +99,24 @@ def _print_controller_response(title: str, response: dict[str, Any]) -> None:
     console.print(table)
 
 
+def _print_mapping(title: str, response: dict[str, Any]) -> None:
+    table = Table(title=title)
+    table.add_column("Field")
+    table.add_column("Value")
+    for key, value in response.items():
+        if isinstance(value, dict):
+            rendered = ", ".join(f"{k}={v}" for k, v in value.items()) or "{}"
+        else:
+            rendered = str(value)
+        table.add_row(key, rendered)
+    console.print(table)
+
+
+def _daemon_request(command: str, socket_path: str) -> None:
+    response = ipc_request(command, socket_path=socket_path)
+    _print_mapping(command, response)
+
+
 def _run_controller_command(command: str, port: str, timeout: float) -> None:
     client = _controller_client(port, timeout)
     try:
@@ -137,6 +158,59 @@ def controller_heartbeat(
 ) -> None:
     """Send one safe heartbeat request to the ESP32 controller."""
     _run_controller_command("heartbeat", port, timeout)
+
+
+@app.command("daemon-run")
+def daemon_run(
+    serial_port: Annotated[
+        str, typer.Option("--serial-port", help="ESP32 serial device.")
+    ] = DEFAULT_SERIAL_PORT,
+    socket_path: Annotated[
+        str, typer.Option("--socket", help="Unix socket path for local daemon IPC.")
+    ] = DEFAULT_SOCKET_PATH,
+) -> None:
+    """Run the persistent Raspberry Pi controller daemon."""
+    run_daemon(serial_port=serial_port, socket_path=socket_path)
+
+
+@app.command("daemon-status")
+def daemon_status(
+    socket_path: Annotated[
+        str, typer.Option("--socket", help="Unix socket path for local daemon IPC.")
+    ] = DEFAULT_SOCKET_PATH,
+) -> None:
+    """Read daemon status through the Unix socket."""
+    _daemon_request("get_daemon_status", socket_path)
+
+
+@app.command("daemon-controller-status")
+def daemon_controller_status(
+    socket_path: Annotated[
+        str, typer.Option("--socket", help="Unix socket path for local daemon IPC.")
+    ] = DEFAULT_SOCKET_PATH,
+) -> None:
+    """Read ESP32 controller status through the Unix socket."""
+    _daemon_request("get_controller_status", socket_path)
+
+
+@app.command("daemon-controller-identity")
+def daemon_controller_identity(
+    socket_path: Annotated[
+        str, typer.Option("--socket", help="Unix socket path for local daemon IPC.")
+    ] = DEFAULT_SOCKET_PATH,
+) -> None:
+    """Read ESP32 controller identity through the Unix socket."""
+    _daemon_request("get_controller_identity", socket_path)
+
+
+@app.command("daemon-reconnect")
+def daemon_reconnect(
+    socket_path: Annotated[
+        str, typer.Option("--socket", help="Unix socket path for local daemon IPC.")
+    ] = DEFAULT_SOCKET_PATH,
+) -> None:
+    """Ask the daemon to close and reopen the ESP32 serial connection."""
+    _daemon_request("force_reconnect", socket_path)
 
 
 @app.command("audio-list")

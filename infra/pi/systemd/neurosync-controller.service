@@ -1,0 +1,33 @@
+[Unit]
+Description=NeuroSync persistent ESP32 controller daemon
+After=network.target
+
+[Service]
+Type=simple
+User=bowen
+Group=neurosync
+SupplementaryGroups=dialout
+WorkingDirectory=/home/bowen/apps/neurosync-pro
+RuntimeDirectory=neurosync
+RuntimeDirectoryMode=0750
+ExecStart=/home/bowen/apps/neurosync-pro/.venv/bin/python -m neurosync.control.cli daemon-run --serial-port /dev/ttyUSB0 --socket /run/neurosync/controller.sock
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/neurosync
+DevicePolicy=closed
+DeviceAllow=/dev/ttyUSB0 rw
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

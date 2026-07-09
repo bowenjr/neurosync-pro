@@ -52,12 +52,14 @@ class SerialLink:
         port: str,
         baudrate: int = DEFAULT_BAUDRATE,
         timeout: float = 1.0,
+        write_timeout: float = 1.0,
         startup_delay: float = DEFAULT_STARTUP_DELAY,
         sleep_func: Callable[[float], None] = time.sleep,
     ) -> None:
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.write_timeout = write_timeout
         self.startup_delay = startup_delay
         self._sleep = sleep_func
         self._conn: serial.Serial | None = None
@@ -72,6 +74,7 @@ class SerialLink:
         self._conn.parity = serial.PARITY_NONE
         self._conn.stopbits = serial.STOPBITS_ONE
         self._conn.timeout = self.timeout
+        self._conn.write_timeout = self.write_timeout
         self._conn.dtr = False
         self._conn.rts = False
         self._conn.open()

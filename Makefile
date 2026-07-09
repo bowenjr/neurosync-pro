@@ -1,5 +1,7 @@
 .PHONY: doctor lint typecheck test check validate-make-booleans \
         pi-status pi-verify pi-inventory pi-inventory-save pi-bootstrap pi-deploy pi-test pi-logs pi-shell \
+        pi-controller-install pi-controller-start pi-controller-stop pi-controller-restart \
+        pi-controller-status pi-controller-logs pi-controller-test \
         esp32-detect esp32-build esp32-chip-info esp32-flash esp32-monitor esp32-flash-monitor
 
 BOOL_TRUE_VALUES := YES 1 TRUE true
@@ -74,6 +76,39 @@ pi-logs:
 
 pi-shell:
 	scripts/pi/shell.sh
+
+pi-controller-install:
+ifeq ($(call bool_true,CONFIRM),)
+	$(error pi-controller-install requires affirmative CONFIRM=YES/1/TRUE/true, e.g. make pi-controller-install CONFIRM=YES)
+endif
+	scripts/pi/controller-service.sh --confirm install
+
+pi-controller-start:
+ifeq ($(call bool_true,CONFIRM),)
+	$(error pi-controller-start requires affirmative CONFIRM=YES/1/TRUE/true, e.g. make pi-controller-start CONFIRM=YES)
+endif
+	scripts/pi/controller-service.sh --confirm start
+
+pi-controller-stop:
+ifeq ($(call bool_true,CONFIRM),)
+	$(error pi-controller-stop requires affirmative CONFIRM=YES/1/TRUE/true, e.g. make pi-controller-stop CONFIRM=YES)
+endif
+	scripts/pi/controller-service.sh --confirm stop
+
+pi-controller-restart:
+ifeq ($(call bool_true,CONFIRM),)
+	$(error pi-controller-restart requires affirmative CONFIRM=YES/1/TRUE/true, e.g. make pi-controller-restart CONFIRM=YES)
+endif
+	scripts/pi/controller-service.sh --confirm restart
+
+pi-controller-status:
+	scripts/pi/controller-service.sh status
+
+pi-controller-logs:
+	scripts/pi/controller-service.sh logs
+
+pi-controller-test:
+	scripts/pi/controller-service.sh test
 
 # --- ESP32 ----------------------------------------------------------------
 # esp32-detect and esp32-build are safe. esp32-flash requires CONFIRM=YES

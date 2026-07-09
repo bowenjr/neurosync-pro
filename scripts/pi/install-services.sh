@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Installs the systemd --user unit(s) under infra/pi/systemd/ onto the Pi.
-#
-# NOT run during initial setup. Refuses to run until a real application
-# entry point (`neurosync-supervisor`) exists in the deployed pyproject.toml
-# — installing a unit that immediately crash-loops is worse than not
-# installing one. Requires --confirm.
+# Installs the system-level NeuroSync controller unit on the Pi.
+# Requires --confirm. Does not start the service; use the explicit
+# pi-controller-start target after reviewing the installed unit.
 #
 # Usage: scripts/pi/install-services.sh --confirm
 set -euo pipefail
 # shellcheck source=../common/lib.sh
+# shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/../common/lib.sh"
 
 CONFIRM_FLAG=0
@@ -18,26 +16,31 @@ for arg in "$@"; do
     *) ns_log_err "Unknown argument: $arg"; exit 2 ;;
   esac
 done
-ns_require_confirm "Installing systemd units on the Raspberry Pi"
+if [ "$CONFIRM_FLAG" != "1" ]; then
+  ns_require_confirm "Installing systemd units on the Raspberry Pi"
+fi
 
 ns_load_hardware_env
 repo_root="$(ns_repo_root)"
 pi_alias="$NEUROSYNC_PI_HOST"
-pi_path="$NEUROSYNC_PI_PATH"
+unit="$repo_root/infra/pi/systemd/neurosync-controller.service"
 
-if ! grep -q 'neurosync-supervisor' "$repo_root/pyproject.toml" 2>/dev/null; then
-  ns_log_err "No 'neurosync-supervisor' entry point in pyproject.toml yet. Refusing to install a service for code that doesn't exist."
-  ns_log_err "This is expected at initial-setup time — install-services.sh is intentionally not run during Phase 12."
+if [ ! -f "$unit" ]; then
+  ns_log_err "Missing controller unit: $unit"
   exit 1
 fi
 
-unit_dir="$repo_root/infra/pi/systemd"
-ns_log_info "Installing unit templates from $unit_dir to $pi_alias..."
-ssh -o BatchMode=yes "$pi_alias" 'mkdir -p ~/.config/systemd/user'
-for template in "$unit_dir"/*.service.template; do
-  name="$(basename "$template" .template)"
-  sed "s#__NEUROSYNC_PI_PATH__#$pi_path#g" "$template" | \
-    ssh -o BatchMode=yes "$pi_alias" "cat > ~/.config/systemd/user/$name"
-  ssh -o BatchMode=yes "$pi_alias" "systemctl --user daemon-reload && systemctl --user enable --now $name"
-  ns_log_info "Installed and started $name"
-done
+ns_log_info "Installing neurosync-controller.service on $pi_alias without starting it..."
+ssh -o BatchMode=yes "$pi_alias" bash -s -- "$NEUROSYNC_PI_USER" <<'REMOTE_SCRIPT'
+set -euo pipefail
+user="$1"
+sudo groupadd -f neurosync
+sudo usermod -aG neurosync "$user"
+if getent group dialout >/dev/null 2>&1; then
+  sudo usermod -aG dialout "$user"
+fi
+REMOTE_SCRIPT
+
+ssh -o BatchMode=yes "$pi_alias" 'sudo install -o root -g root -m 0644 /dev/stdin /etc/systemd/system/neurosync-controller.service' <"$unit"
+ssh -o BatchMode=yes "$pi_alias" 'sudo systemctl daemon-reload'
+ns_log_info "Installed neurosync-controller.service. It has not been enabled or started."

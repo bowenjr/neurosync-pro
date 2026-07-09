@@ -150,4 +150,17 @@ require_not_contains "pi-inventory read-only" "$out" "hardware/manifests/raspber
 out="$(require_failure "pi-inventory-save no confirm" pi-inventory-save)"
 require_contains "pi-inventory-save no confirm" "$out" "pi-inventory-save requires affirmative CONFIRM"
 
+out="$(require_failure "pi-controller-install no confirm" pi-controller-install)"
+require_contains "pi-controller-install no confirm" "$out" "pi-controller-install requires affirmative CONFIRM"
+
+out="$(require_success "pi-controller-install confirm" pi-controller-install CONFIRM=YES)"
+require_contains "pi-controller-install confirm" "$out" "scripts/pi/controller-service.sh --confirm install"
+
+out="$(require_failure "pi-controller-start no confirm" pi-controller-start)"
+require_contains "pi-controller-start no confirm" "$out" "pi-controller-start requires affirmative CONFIRM"
+
+out="$(require_success "pi-controller-status read-only" pi-controller-status)"
+require_contains "pi-controller-status read-only" "$out" "scripts/pi/controller-service.sh status"
+require_not_contains "pi-controller-status read-only" "$out" "--confirm"
+
 ns_log_info "Makefile boolean dry-run checks passed."
