@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import math
 import struct
+import sys
 import wave
 from collections.abc import Iterable
 from pathlib import Path
 
 DEFAULT_SAMPLE_RATE = 48_000
 DEFAULT_AMPLITUDE = 0.25
+PCM5122_FULL_SCALE_RMS_V = 2.1
 PCM_MAX = 32767
 
 StereoSample = tuple[int, int]
@@ -134,6 +136,25 @@ def generate_wav(
     write_wav(out_path, samples, sample_rate=sample_rate)
 
 
+def amplitude_summary(
+    *,
+    channel: str,
+    freq_hz: float,
+    seconds: float,
+    sample_rate: int,
+    amplitude: float,
+) -> str:
+    """Return a one-line operator summary for expected line-level voltage."""
+    dbfs = 20.0 * math.log10(amplitude)
+    expected_rms = PCM5122_FULL_SCALE_RMS_V * amplitude
+    return (
+        f"Generated channel={channel} freq={freq_hz:g}Hz seconds={seconds:g} "
+        f"sample_rate={sample_rate}Hz amplitude={amplitude:g} ({dbfs:.1f} dBFS); "
+        f"expect ~{expected_rms:.2f} V RMS into high-Z at mixer 0 dB "
+        f"assuming PCM5122 {PCM5122_FULL_SCALE_RMS_V:.1f} V RMS at 0 dBFS."
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate stereo WAV test tones.")
     parser.add_argument(
@@ -152,18 +173,34 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_AMPLITUDE,
         help="linear amplitude, 0.0 to 1.0; default is conservative for line-level checks",
     )
+    parser.add_argument(
+        "--full-scale",
+        action="store_true",
+        help="set amplitude to 1.0 for full-scale line-level verification",
+    )
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
+    amplitude = 1.0 if args.full_scale else args.amplitude
     generate_wav(
         channel=args.channel,
         freq_hz=args.freq,
         seconds=args.seconds,
         out_path=args.out,
         sample_rate=args.sample_rate,
-        amplitude=args.amplitude,
+        amplitude=amplitude,
+    )
+    print(
+        amplitude_summary(
+            channel=args.channel,
+            freq_hz=args.freq,
+            seconds=args.seconds,
+            sample_rate=args.sample_rate,
+            amplitude=amplitude,
+        ),
+        file=sys.stderr,
     )
 
 

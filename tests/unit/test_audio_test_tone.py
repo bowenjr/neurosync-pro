@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import struct
+import sys
 import wave
 from pathlib import Path
 
-from neurosync.audio.test_tone import generate_wav
+import pytest
+
+from neurosync.audio.test_tone import generate_wav, main
 
 
 def read_wav(path: Path) -> tuple[int, list[tuple[int, int]]]:
@@ -61,7 +64,7 @@ def test_frequency_is_within_zero_crossing_tolerance(tmp_path: Path) -> None:
     sample_rate, samples = read_wav(out)
     left = [sample[0] for sample in samples]
 
-    assert dominant_frequency(left, sample_rate=sample_rate) == 440.0
+    assert abs(dominant_frequency(left, sample_rate=sample_rate) - 440.0) < 1.0
 
 
 def test_identification_sequence_is_left_then_right(tmp_path: Path) -> None:
@@ -78,3 +81,44 @@ def test_identification_sequence_is_left_then_right(tmp_path: Path) -> None:
     assert all(left == 0 and right == 0 for left, right in middle)
     assert all(left == 0 for left, _right in last)
     assert any(right != 0 for _left, right in last)
+
+
+@pytest.mark.parametrize(
+    ("args", "expected_voltage"),
+    [
+        (["--amplitude", "0.25"], "expect ~0.53 V RMS"),
+        (["--full-scale"], "expect ~2.10 V RMS"),
+    ],
+)
+def test_cli_stderr_summary_reports_expected_rms(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    args: list[str],
+    expected_voltage: str,
+) -> None:
+    out = tmp_path / "summary.wav"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "test_tone",
+            "--channel",
+            "left",
+            "--freq",
+            "1000",
+            "--seconds",
+            "1",
+            "--out",
+            str(out),
+            *args,
+        ],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+    assert "channel=left" in captured.err
+    assert "freq=1000Hz" in captured.err
+    assert "sample_rate=48000Hz" in captured.err
+    assert expected_voltage in captured.err
