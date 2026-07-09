@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Enable the PiFi DAC+ V2.0 / PCM5122 I2S overlay on Raspberry Pi OS.
-# This edits /boot/firmware/config.txt and requires an explicit --confirm.
+# This edits /boot/firmware/config.txt and requires --confirm unless --dry-run is used.
 set -euo pipefail
 # shellcheck source=../common/lib.sh
 # shellcheck disable=SC1091
@@ -9,17 +9,19 @@ source "$(dirname "${BASH_SOURCE[0]}")/../common/lib.sh"
 # shellcheck disable=SC2034  # consumed by ns_require_confirm from scripts/common/lib.sh
 CONFIRM_FLAG=0
 CONFIG_PATH="/boot/firmware/config.txt"
-OVERLAY_NAME=""
+DRY_RUN=0
 OVERLAY_DIR="/boot/firmware/overlays"
 DEFAULT_OVERLAY="hifiberry-dacplus-std"
 FALLBACK_OVERLAY="hifiberry-dacplus"
+OVERLAY_NAME="$DEFAULT_OVERLAY"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/pi/configure-pifi.sh --confirm [--config PATH] [--overlay NAME]
+Usage: scripts/pi/configure-pifi.sh [--dry-run] --confirm [--config PATH] [--overlay NAME]
 
 Enables a HiFiBerry DAC+ overlay used by PCM5122-compatible DAC+ boards.
-For Raspberry Pi OS Trixie / kernels >= 6.1.77, the default target is:
+For the verified PiFi DAC+ V2.0 target on Raspberry Pi OS Trixie
+(kernel 6.18.34+rpt-rpi-v8), the default target is:
   dtoverlay=hifiberry-dacplus-std
 
 For older kernels, use the documented fallback if the std overlay is absent:
@@ -33,7 +35,10 @@ And explicitly enables I2S:
 
 Before editing boot config, run and review:
   uname -r
-  ls -1 /boot/firmware/overlays/hifiberry-dac*.dtbo
+  ls -1 /boot/firmware/overlays/hifiberry-dacplus*.dtbo
+
+Use --dry-run first to print the proposed config.txt to stdout without
+writing anything. Use --confirm only after reviewing the dry-run output.
 
 This script must be run on the Raspberry Pi and a reboot is required after
 it changes /boot/firmware/config.txt.
@@ -45,6 +50,9 @@ for arg in "$@"; do
     --confirm)
       # shellcheck disable=SC2034  # consumed by ns_require_confirm from scripts/common/lib.sh
       CONFIRM_FLAG=1
+      ;;
+    --dry-run)
+      DRY_RUN=1
       ;;
     --config=*)
       CONFIG_PATH="${arg#--config=}"
@@ -64,10 +72,12 @@ for arg in "$@"; do
   esac
 done
 
-ns_require_confirm "PiFi boot configuration"
+if [ "$DRY_RUN" != "1" ]; then
+  ns_require_confirm "PiFi boot configuration"
+fi
 
 case "$OVERLAY_NAME" in
-  ""|hifiberry-dacplus-std|hifiberry-dacplus)
+  hifiberry-dacplus-std|hifiberry-dacplus)
     ;;
   *)
     ns_log_err "Unsupported PiFi overlay override: $OVERLAY_NAME"
@@ -81,34 +91,13 @@ if [ ! -f "$CONFIG_PATH" ]; then
   exit 1
 fi
 
-ns_log_info "Read-only overlay check operators must review before editing:"
-ns_log_info "  uname -r"
-uname -r
-ns_log_info "  ls -1 ${OVERLAY_DIR}/hifiberry-dac*.dtbo"
-if ! ls -1 "${OVERLAY_DIR}"/hifiberry-dac*.dtbo; then
-  ns_log_err "No HiFiBerry DAC overlays found under $OVERLAY_DIR"
+if [ "$DRY_RUN" != "1" ] && [ ! -f "${OVERLAY_DIR}/${OVERLAY_NAME}.dtbo" ]; then
+  ns_log_err "Requested overlay is absent: ${OVERLAY_DIR}/${OVERLAY_NAME}.dtbo"
+  ns_log_err "Run: uname -r"
+  ns_log_err "Run: ls -1 ${OVERLAY_DIR}/hifiberry-dacplus*.dtbo"
+  ns_log_err "Use --overlay=${FALLBACK_OVERLAY} only if that fallback .dtbo is verified present."
   exit 1
 fi
-
-if [ -z "$OVERLAY_NAME" ]; then
-  if [ -f "${OVERLAY_DIR}/${DEFAULT_OVERLAY}.dtbo" ]; then
-    OVERLAY_NAME="$DEFAULT_OVERLAY"
-  elif [ -f "${OVERLAY_DIR}/${FALLBACK_OVERLAY}.dtbo" ]; then
-    OVERLAY_NAME="$FALLBACK_OVERLAY"
-    ns_log_warn "${DEFAULT_OVERLAY}.dtbo absent; using fallback ${FALLBACK_OVERLAY}."
-  else
-    ns_log_err "Neither ${DEFAULT_OVERLAY}.dtbo nor ${FALLBACK_OVERLAY}.dtbo exists."
-    ns_log_err "Re-run with --overlay=<verified-name> only after confirming the board overlay."
-    exit 1
-  fi
-else
-  if [ ! -f "${OVERLAY_DIR}/${OVERLAY_NAME}.dtbo" ]; then
-    ns_log_err "Requested overlay is absent: ${OVERLAY_DIR}/${OVERLAY_NAME}.dtbo"
-    exit 1
-  fi
-fi
-
-ns_log_info "Selected overlay: dtoverlay=${OVERLAY_NAME}"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_path="${CONFIG_PATH}.bak.${timestamp}"
@@ -119,29 +108,28 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ns_log_info "Backing up $CONFIG_PATH to $backup_path"
-cp -p "$CONFIG_PATH" "$backup_path"
-
-awk -v overlay="$OVERLAY_NAME" '
+transform_config() {
+  local input_path="$1"
+  awk -v overlay="$OVERLAY_NAME" '
   BEGIN {
     saw_audio = 0
     saw_i2s = 0
   }
-  /^[[:space:]]*dtparam=audio=/ {
+  /^[[:space:]]*#?[[:space:]]*dtparam=audio=/ {
     if (!saw_audio) {
       print "dtparam=audio=off"
       saw_audio = 1
     }
     next
   }
-  /^[[:space:]]*dtparam=i2s=/ {
+  /^[[:space:]]*#?[[:space:]]*dtparam=i2s=/ {
     if (!saw_i2s) {
       print "dtparam=i2s=on"
       saw_i2s = 1
     }
     next
   }
-  /^[[:space:]]*dtoverlay=hifiberry-/ {
+  /^[[:space:]]*#?[[:space:]]*dtoverlay=hifiberry-/ {
     next
   }
   { print }
@@ -154,7 +142,19 @@ awk -v overlay="$OVERLAY_NAME" '
     }
     print "dtoverlay=" overlay
   }
-' "$CONFIG_PATH" >"$tmp_path"
+  ' "$input_path"
+}
+
+transform_config "$CONFIG_PATH" >"$tmp_path"
+
+if [ "$DRY_RUN" = "1" ]; then
+  cat "$tmp_path"
+  exit 0
+fi
+
+ns_log_info "Selected overlay: dtoverlay=${OVERLAY_NAME}"
+ns_log_info "Backing up $CONFIG_PATH to $backup_path"
+cp -p "$CONFIG_PATH" "$backup_path"
 
 if cmp -s "$CONFIG_PATH" "$tmp_path"; then
   ns_log_info "$CONFIG_PATH already contains the requested PiFi settings."
@@ -166,7 +166,7 @@ fi
 ns_log_info "Assumption to confirm on the bench:"
 ns_log_info "  PiFi DAC+ V2.0 is PCM5122-based and HiFiBerry-DAC-compatible."
 ns_log_info "  The selected Raspberry Pi overlay is dtoverlay=${OVERLAY_NAME}."
-ns_log_info "  hifiberry-dacplus-std is expected on Trixie kernels >= 6.1.77;"
+ns_log_info "  hifiberry-dacplus-std is confirmed present on kernel 6.18.34+rpt-rpi-v8;"
 ns_log_info "  hifiberry-dacplus is the fallback when the std .dtbo is absent."
 ns_log_info "Next steps:"
 ns_log_info "  1. Reboot the Raspberry Pi."

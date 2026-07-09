@@ -4,7 +4,7 @@ set -euo pipefail
 
 echo "== Kernel and available HiFiBerry overlays =="
 uname -r
-ls -1 /boot/firmware/overlays/hifiberry-dac*.dtbo
+ls -1 /boot/firmware/overlays/hifiberry-dacplus*.dtbo
 echo
 
 echo "== ALSA cards =="

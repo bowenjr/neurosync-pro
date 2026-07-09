@@ -10,8 +10,8 @@ low-impedance headphones, or an amplifier.
 
 ## Hardware and overlay assumption
 
-The PiFi DAC+ V2.0 is a PCM5122 DAC+ board. On Raspberry Pi OS Trixie
-with kernels >= 6.1.77, the expected overlay is:
+The PiFi DAC+ V2.0 is a PCM5122 DAC+ board. On the verified Raspberry Pi
+OS Trixie target with kernel `6.18.34+rpt-rpi-v8`, the expected overlay is:
 
 ```ini
 dtoverlay=hifiberry-dacplus-std
@@ -24,7 +24,7 @@ fallback:
 dtoverlay=hifiberry-dacplus
 ```
 
-Do not use `hifiberry-dac`; that is the non-plus DAC overlay.
+Do not use the non-plus DAC overlay.
 
 ## 1. Mount the HAT
 
@@ -52,7 +52,7 @@ On the Pi, run the read-only overlay check before editing boot config:
 
 ```bash
 uname -r
-ls -1 /boot/firmware/overlays/hifiberry-dac*.dtbo
+ls -1 /boot/firmware/overlays/hifiberry-dacplus*.dtbo
 ```
 
 Use `hifiberry-dacplus-std` when
@@ -70,18 +70,22 @@ sudo cp -p /boot/firmware/config.txt /boot/firmware/config.txt.manual-pifi-backu
 Then run the configure script with the verified overlay:
 
 ```bash
+scripts/pi/configure-pifi.sh --dry-run --overlay=hifiberry-dacplus-std
 scripts/pi/configure-pifi.sh --confirm --overlay=hifiberry-dacplus-std
 ```
 
 If the std overlay is absent and the fallback was confirmed:
 
 ```bash
+scripts/pi/configure-pifi.sh --dry-run --overlay=hifiberry-dacplus
 scripts/pi/configure-pifi.sh --confirm --overlay=hifiberry-dacplus
 ```
 
-The script also creates a timestamped backup, removes any existing active
-`dtoverlay=hifiberry-*` line so only one audio overlay remains, sets
-`dtparam=audio=off`, and sets `dtparam=i2s=on`.
+Review the dry-run output before running the confirmed write. The script
+also creates a timestamped backup, removes any existing active
+`dtoverlay=hifiberry-*` line so only one audio overlay remains, rewrites
+`dtparam=audio=on` to `dtparam=audio=off`, enables commented or missing
+`dtparam=i2s=on`, and writes exactly one selected DAC+ overlay line.
 
 Reboot after configuration:
 
@@ -95,7 +99,7 @@ sudo reboot
 aplay -l
 aplay -L | grep -Ei 'sndrpihifiberry|dacplus|hifiberry'
 scripts/pi/verify-pifi.sh
-dmesg | grep -Ei 'pcm512|hifiberry|sclk|bclk|reset|probe'
+dmesg | grep -iE "pcm512|hifiberry|i2s"
 ```
 
 Acceptance requires more than card enumeration. The kernel log must not
